@@ -32,26 +32,12 @@ app.use('/previews', express.static(path.join(__dirname, 'uploads', 'previews'))
 
 
 // Routes
-const authRoutes = require('./routes/auth');
-console.log('AUTH ROUTER:', typeof authRoutes);
-
-const templateRoutes = require('./routes/templates');
-console.log('TEMPLATE ROUTER:', typeof templateRoutes);
-
-const orderRoutes = require('./routes/orders');
-console.log('ORDER ROUTER:', typeof orderRoutes);
-
-const paymentRoutes = require('./routes/payments');
-console.log('PAYMENT ROUTER:', typeof paymentRoutes);
-
-const downloadRoutes = require('./routes/downloads');
-console.log('DOWNLOAD ROUTER:', typeof downloadRoutes);
-
-app.use('/api/auth', authRoutes);
-app.use('/api/templates', templateRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/downloads', downloadRoutes);
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/templates', require('./routes/templates'));
+app.use('/api/orders', require('./routes/orders'));
+app.use('/api/payments', require('./routes/payments'));
+app.use('/api/downloads', require('./routes/downloads'));
 // Serve pages
 const page = (name) => (req, res) =>
   res.sendFile(path.join(__dirname, 'public', name));
