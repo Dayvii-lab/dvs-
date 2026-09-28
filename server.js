@@ -30,7 +30,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Previews are public — but NOT the downloadable files
 app.use('/previews', express.static(path.join(__dirname, 'uploads', 'previews')));
 
-// Routes
+
 // Routes
 const authRoutes = require('./routes/auth');
 console.log('AUTH ROUTER:', typeof authRoutes);
