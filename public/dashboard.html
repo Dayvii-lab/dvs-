@@ -1,1 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — PixelVault</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <a href="/" class="brand">PixelVault</a>
+      <div class="nav-links" id="nav-links"></div>
+    </div>
+  </nav>
 
+  <div class="container" style="padding: 40px 24px;">
+    <h1 class="section-title">My Purchases</h1>
+    <div id="orders"><div class="loading">Loading...</div></div>
+  </div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    (async () => {
+      const user = await getCurrentUser();
+      if (!user) { location.href = '/login'; return; }
+
+      const box = document.getElementById('orders');
+
+      async function loadOrders() {
+        try {
+          const orders = await api('/orders/mine');
+          if (!orders.length) {
+            box.innerHTML = `<div class="empty">You haven't purchased any templates yet.<br><br><a class="btn btn-primary" href="/">Browse Templates</a></div>`;
+            return;
+          }
+
+          box.innerHTML = orders.map(o => {
+            const t = o.template || {};
+            const canDownload = o.status === 'paid';
+            const statusBadge = `<span class="badge badge-${o.status}">${o.status}</span>`;
+
+            return `
+              <div class="order-row">
+                <img src="${t.previewImage || ''}" alt="" />
+                <div class="info">
+                  <h4>${escapeHtml(t.title || 'Template')}</h4>
+                  <p>${formatKES(o.amount)} · ${new Date(o.createdAt).toLocaleDateString()}</p>
+                  ${o.mpesaReceipt ? `<p style="font-size:0.75rem">Receipt: ${escapeHtml(o.mpesaReceipt)}</p>` : ''}
+                </div>
+                ${statusBadge}
+                ${canDownload
+                  ? `<button class="btn btn-success" data-dl="${t._id}">Download</button>`
+                  : `<a class="btn btn-primary" href="/checkout/${t._id}">Complete Payment</a>`}
+              </div>
+            `;
+          }).join('');
+
+          box.querySelectorAll('[data-dl]').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              const tid = e.target.dataset.dl;
+              e.target.disabled = true;
+              e.target.innerHTML = '<span class="spinner"></span>';
+              try {
+                const { url } = await api('/downloads/request/' + tid, { method: 'POST' });
+                window.location.href = url;
+                setTimeout(loadOrders, 2000);
+              } catch (err) {
+                alert(err.message);
+                e.target.disabled = false;
+                e.target.textContent = 'Download';
+              }
+            });
+          });
+        } catch (err) {
+          box.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        }
+      }
+
+      loadOrders();
+    })();
+  </script>
+</body>
+</html>
