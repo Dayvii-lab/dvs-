@@ -1,1 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkout — PixelVault</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <a href="/" class="brand">PixelVault</a>
+      <div class="nav-links" id="nav-links"></div>
+    </div>
+  </nav>
 
+  <div class="container">
+    <div class="form-card" id="checkout" style="max-width:520px">
+      <div class="loading">Loading checkout...</div>
+    </div>
+  </div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    const templateId = location.pathname.split('/').pop();
+
+    (async () => {
+      const user = await getCurrentUser();
+      if (!user) { location.href = '/login'; return; }
+
+      const box = document.getElementById('checkout');
+      let orderId = null;
+      let template = null;
+      let polling = null;
+
+      try {
+        const res = await api('/templates/' + templateId);
+        template = res.template;
+
+        // Create (or reuse) the order
+        const { order, alreadyPaid } = await api('/orders', {
+          method: 'POST',
+          body: JSON.stringify({ templateId }),
+        });
+        orderId = order._id;
+
+        if (alreadyPaid || order.status === 'paid') {
+          box.innerHTML = `<div class="alert alert-success">You've already purchased this template.</div>
+            <a class="btn btn-success btn-block" href="/template/${template._id}">Go to template</a>`;
+          return;
+        }
+
+        box.innerHTML = `
+          <h2>Checkout</h2>
+          <div style="display:flex;gap:16px;margin-bottom:24px;align-items:center">
+            <img src="${template.previewImage}" style="width:80px;height:60px;object-fit:cover;border-radius:8px" />
+            <div>
+              <div style="font-weight:700">${escapeHtml(template.title)}</div>
+              <div style="color:var(--muted);font-size:0.9rem">${escapeHtml(template.category)}</div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;padding:16px;background:var(--bg);border-radius:var(--radius);margin-bottom:24px">
+            <span>Total</span>
+            <span style="font-weight:700;font-size:1.25rem">${formatKES(template.price)}</span>
+          </div>
+
+          <div id="msg"></div>
+
+          <form id="pay-form">
+            <div class="form-group">
+              <label>M-Pesa Phone Number</label>
+              <input type="tel" name="phone" placeholder="07XX XXX XXX" required />
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">Pay ${formatKES(template.price)} with M-Pesa</button>
+          </form>
+
+          <div id="status" style="margin-top:20px"></div>
+        `;
+
+        document.getElementById('pay-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const btn = e.target.querySelector('button');
+          const msg = document.getElementById('msg');
+          const status = document.getElementById('status');
+          msg.innerHTML = ''; status.innerHTML = '';
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner"></span> Sending STK push...';
+
+          try {
+            const phone = e.target.phone.value;
+            await api('/payments/mpesa/stkpush', {
+              method: 'POST',
+              body: JSON.stringify({ orderId, phone }),
+            });
+
+            msg.innerHTML = `<div class="alert alert-info">📱 Check your phone and enter your M-Pesa PIN to complete the payment.</div>`;
+            status.innerHTML = `<div style="text-align:center"><span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span> Waiting for confirmation...</div>`;
+
+            // Poll every 3s up to 40 times (~2 min)
+            let tries = 0;
+            polling = setInterval(async () => {
+              tries++;
+              try {
+                const s = await api('/payments/mpesa/status/' + orderId);
+                if (s.status === 'paid') {
+                  clearInterval(polling);
+                  status.innerHTML = `<div class="alert alert-success">✅ Payment received! Redirecting...</div>`;
+                  setTimeout(() => location.href = '/template/' + template._id, 1200);
+                } else if (s.status === 'failed' || s.status === 'cancelled') {
+                  clearInterval(polling);
+                  status.innerHTML = `<div class="alert alert-error">Payment ${s.status}. Please try again.</div>`;
+                  btn.disabled = false;
+                  btn.textContent = `Pay ${formatKES(template.price)} with M-Pesa`;
+                }
+              } catch {}
+              if (tries >= 40) {
+                clearInterval(polling);
+                status.innerHTML = `<div class="alert alert-error">Timed out. If you paid, refresh this page.</div>`;
+                btn.disabled = false;
+                btn.textContent = 'Retry';
+              }
+            }, 3000);
+          } catch (err) {
+            msg.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+            btn.disabled = false;
+            btn.textContent = `Pay ${formatKES(template.price)} with M-Pesa`;
+          }
+        });
+      } catch (err) {
+        box.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>
