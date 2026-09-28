@@ -1,1 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PixelVault — Premium Digital Templates</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <a href="/" class="brand">PixelVault</a>
+      <div class="nav-links" id="nav-links"></div>
+    </div>
+  </nav>
 
+  <section class="hero">
+    <div class="container">
+      <h1>Premium Digital Templates<br />for Creators &amp; Pros</h1>
+      <p>Logos, flyers, social kits, pitch decks, and more. Instantly downloadable after secure M-Pesa payment.</p>
+      <a href="#catalog" class="btn btn-primary">Browse Templates</a>
+    </div>
+  </section>
+
+  <div class="container" id="catalog">
+    <div class="filters">
+      <input type="text" id="search" placeholder="Search templates..." />
+      <select id="category">
+        <option value="All">All Categories</option>
+        <option>Logo</option>
+        <option>Flyer</option>
+        <option>Social Media</option>
+        <option>Presentation</option>
+        <option>Business Card</option>
+        <option>Resume</option>
+        <option>UI Kit</option>
+        <option>Other</option>
+      </select>
+      <select id="sort">
+        <option value="new">Newest</option>
+        <option value="popular">Most Popular</option>
+        <option value="price_asc">Price: Low → High</option>
+        <option value="price_desc">Price: High → Low</option>
+      </select>
+    </div>
+
+    <div id="grid" class="grid"></div>
+    <div id="loading" class="loading">Loading templates...</div>
+    <div id="empty" class="empty hidden">No templates found.</div>
+  </div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    const grid = document.getElementById('grid');
+    const loading = document.getElementById('loading');
+    const empty = document.getElementById('empty');
+
+    async function load() {
+      loading.classList.remove('hidden');
+      grid.innerHTML = '';
+      empty.classList.add('hidden');
+
+      const q = document.getElementById('search').value.trim();
+      const cat = document.getElementById('category').value;
+      const sort = document.getElementById('sort').value;
+
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      if (cat && cat !== 'All') params.set('category', cat);
+      if (sort) params.set('sort', sort);
+
+      try {
+        const templates = await api('/templates?' + params.toString());
+        loading.classList.add('hidden');
+
+        if (!templates.length) { empty.classList.remove('hidden'); return; }
+
+        grid.innerHTML = templates.map(t => `
+          <a href="/template/${t._id}" class="card">
+            <img src="${t.previewImage}" alt="${escapeHtml(t.title)}" class="card-img" loading="lazy" />
+            <div class="card-body">
+              <span class="card-cat">${escapeHtml(t.category)}</span>
+              <h3 class="card-title">${escapeHtml(t.title)}</h3>
+              <div class="card-footer">
+                <span class="price">${formatKES(t.price)}</span>
+                <span style="color:var(--muted);font-size:0.8rem">${t.sales} sold</span>
+              </div>
+            </div>
+          </a>
+        `).join('');
+      } catch (err) {
+        loading.textContent = 'Failed to load: ' + err.message;
+      }
+    }
+
+    let debounce;
+    document.getElementById('search').addEventListener('input', () => {
+      clearTimeout(debounce); debounce = setTimeout(load, 300);
+    });
+    document.getElementById('category').addEventListener('change', load);
+    document.getElementById('sort').addEventListener('change', load);
+
+    load();
+  </script>
+</body>
+</html>
