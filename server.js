@@ -36,7 +36,6 @@ app.use('/previews', express.static(path.join(__dirname, 'uploads', 'previews'))
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/templates', require('./routes/templates'));
 app.use('/api/orders', require('./routes/orders'));
-app.use('/api/payments', require('./routes/payments'));
 app.use('/api/downloads', require('./routes/downloads'));
 // Serve pages
 const page = (name) => (req, res) =>
@@ -50,6 +49,14 @@ app.get('/template/:id', page('template.html'));
 app.get('/checkout/:id', page('checkout.html'));
 app.get('/admin', page('admin.html'));
 
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'PixelVault'
+  });
+});
+
+
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
@@ -59,5 +66,5 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Server error' });
 });
 
-const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => console.log(`🚀 PixelVault running on port ${PORT}`));
