@@ -1,1 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — PixelVault</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <a href="/" class="brand">PixelVault</a>
+      <div class="nav-links" id="nav-links"></div>
+    </div>
+  </nav>
 
+  <div class="container" style="padding: 40px 24px;">
+    <h1 class="section-title">Admin Panel</h1>
+
+    <div class="admin-form">
+      <h3>Add New Template</h3>
+      <div id="admin-msg"></div>
+      <form id="create-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Title</label>
+            <input name="title" required />
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select name="category" required>
+              <option>Logo</option><option>Flyer</option><option>Social Media</option>
+              <option>Presentation</option><option>Business Card</option>
+              <option>Resume</option><option>UI Kit</option><option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="description" rows="3" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Price (KES)</label>
+            <input type="number" name="price" min="0" step="1" required />
+          </div>
+          <div class="form-group">
+            <label>Tags (comma separated)</label>
+            <input name="tags" placeholder="logo, minimal, brand" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Preview Image (jpg/png/webp)</label>
+            <input type="file" name="preview" accept="image/*" required />
+          </div>
+          <div class="form-group">
+            <label>ZIP File</label>
+            <input type="file" name="file" accept=".zip" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" name="featured" value="true" /> Featured</label>
+        </div>
+        <button class="btn btn-primary" type="submit">Create Template</button>
+      </form>
+    </div>
+
+    <h3 class="section-title">All Templates</h3>
+    <div id="list"><div class="loading">Loading...</div></div>
+  </div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    (async () => {
+      const user = await getCurrentUser();
+      if (!user || user.role !== 'admin') { location.href = '/'; return; }
+
+      const list = document.getElementById('list');
+
+      async function loadList() {
+        const templates = await api('/templates');
+        list.innerHTML = templates.map(t => `
+          <div class="order-row">
+            <img src="${t.previewImage}" />
+            <div class="info">
+              <h4>${escapeHtml(t.title)}</h4>
+              <p>${escapeHtml(t.category)} · ${formatKES(t.price)} · ${t.sales} sales</p>
+            </div>
+            <button class="btn btn-danger" data-del="${t._id}">Delete</button>
+          </div>
+        `).join('');
+
+        list.querySelectorAll('[data-del]').forEach(b => {
+          b.addEventListener('click', async (e) => {
+            if (!confirm('Delete this template?')) return;
+            await api('/templates/' + e.target.dataset.del, { method: 'DELETE' });
+            loadList();
+          });
+        });
+      }
+      loadList();
+
+      document.getElementById('create-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const btn = form.querySelector('button');
+        const msg = document.getElementById('admin-msg');
+        msg.innerHTML = '';
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Uploading...';
+
+        const fd = new FormData();
+        ['title', 'category', 'description', 'price', 'tags'].forEach(k => fd.append(k, form[k].value));
+        if (form.featured.checked) fd.append('featured', 'true');
+        fd.append('preview', form.preview.files[0]);
+        fd.append('file', form.file.files[0]);
+
+        try {
+          await apiForm('/templates', fd);
+          msg.innerHTML = `<div class="alert alert-success">✅ Template created!</div>`;
+          form.reset();
+          loadList();
+        } catch (err) {
+          msg.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Create Template';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
