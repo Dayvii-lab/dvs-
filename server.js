@@ -38,6 +38,7 @@ app.use('/previews', express.static(path.join(__dirname, 'uploads', 'previews'))
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/templates', require('./routes/templates'));
 app.use('/api/orders', require('./routes/orders'));
+// app.use('/api/payments', require('./routes/payments));
 app.use('/api/downloads', require('./routes/downloads'));
 // Serve pages
 const page = (name) => (req, res) =>
