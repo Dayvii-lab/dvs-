@@ -1,1 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Template — PixelVault</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <a href="/" class="brand">PixelVault</a>
+      <div class="nav-links" id="nav-links"></div>
+    </div>
+  </nav>
 
+  <div class="container">
+    <div id="content" class="loading">Loading template...</div>
+  </div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    const id = location.pathname.split('/').pop();
+
+    (async () => {
+      const box = document.getElementById('content');
+      try {
+        const { template, purchased } = await api('/templates/' + id);
+
+        box.classList.remove('loading');
+        box.className = 'detail';
+        box.innerHTML = `
+          <div>
+            <img class="detail-img" src="${template.previewImage}" alt="${escapeHtml(template.title)}" />
+          </div>
+          <div>
+            <span class="card-cat">${escapeHtml(template.category)}</span>
+            <h1>${escapeHtml(template.title)}</h1>
+            <div class="price-large">${formatKES(template.price)}</div>
+            <p style="color:var(--muted);margin-bottom:20px;white-space:pre-line">${escapeHtml(template.description)}</p>
+            ${template.tags?.length ? `<div class="tags">${template.tags.map(t => `<span class="tag">#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+
+            <div style="margin-top:24px;display:flex;flex-direction:column;gap:12px">
+              ${purchased
+                ? `<button class="btn btn-success btn-block" id="dl-btn">⬇ Download Now</button>`
+                : `<a class="btn btn-primary btn-block" href="/checkout/${template._id}">Buy with M-Pesa</a>`}
+              <div style="font-size:0.85rem;color:var(--muted);text-align:center">
+                🔒 Secure payment · Instant download after verification
+              </div>
+            </div>
+
+            <div style="margin-top:32px;padding:16px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);font-size:0.9rem">
+              <strong>Stats</strong><br>
+              <span style="color:var(--muted)">${template.sales} sales · ${template.downloads} downloads</span>
+            </div>
+          </div>
+        `;
+
+        if (purchased) {
+          document.getElementById('dl-btn').addEventListener('click', async (e) => {
+            e.target.disabled = true;
+            e.target.innerHTML = '<span class="spinner"></span> Preparing...';
+            try {
+              const { url } = await api('/downloads/request/' + template._id, { method: 'POST' });
+              window.location.href = url;
+              e.target.innerHTML = '⬇ Download again';
+              e.target.disabled = false;
+            } catch (err) {
+              alert(err.message);
+              e.target.disabled = false;
+              e.target.textContent = '⬇ Download Now';
+            }
+          });
+        }
+      } catch (err) {
+        box.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>
