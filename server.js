@@ -10,6 +10,9 @@ const connectDB = require('./config/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ⭐ Trust Render's proxy so req.ip and rate-limit work correctly
+app.set('trust proxy', 1);
+
 // Security & parsers
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
@@ -17,15 +20,16 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
+// Rate limiting
 app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
 
-// Static
+// Static assets
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/previews', express.static(path.join(__dirname, 'uploads', 'previews')));
 app.use('/portfolios', express.static(path.join(__dirname, 'uploads', 'portfolios')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // fixes admin portfolio links
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Routes
+// API routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/applications', require('./routes/applications'));
 app.use('/api/templates', require('./routes/templates'));
@@ -49,15 +53,19 @@ app.get('/checkout/:id', page('checkout.html'));
 app.get('/admin', page('admin.html'));
 app.get('/pending', page('pending.html'));
 
+// Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'PixelVault' }));
 
+// 404
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+
+// Error handler
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(err.status || 500).json({ error: err.message || 'Server error' });
 });
 
-// ⭐ START ONLY AFTER DB CONNECTS
+// Start only after DB connects
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`🚀 PixelVault running on http://localhost:${PORT}`));
 });
