@@ -13,11 +13,9 @@ const userSchema = new mongoose.Schema({
     enum: ['active', 'pending', 'rejected', 'suspended'],
     default: 'active',
   },
-  // Creator profile
   bio: String,
   skills: [String],
   portfolioUrl: String,
-  // Payout phone (M-Pesa)
   payoutPhone: String,
   createdAt: { type: Date, default: Date.now },
 });
