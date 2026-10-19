@@ -1,12 +1,33 @@
 const express = require('express');
 const Order = require('../models/Order');
 const Template = require('../models/Template');
+const Wallet = require('../models/Wallet');
 const { protect } = require('../middleware/auth');
 const { stkPush, stkQuery, normalizePhone } = require('../utils/mpesa');
 
 const router = express.Router();
 
-// Initiate STK Push
+// Credit creator wallet + bump sales counts (idempotent via paid status check)
+async function finalizeOrder(order, receipt) {
+  if (order.status === 'paid') return;
+  order.status = 'paid';
+  order.paidAt = new Date();
+  order.mpesaReceipt = receipt || order.mpesaReceipt;
+  await order.save();
+
+  await Template.findByIdAndUpdate(order.template, { $inc: { sales: 1 } });
+
+  await Wallet.findOneAndUpdate(
+    { creator: order.creator },
+    {
+      $inc: { balance: order.creatorEarnings, totalEarned: order.creatorEarnings },
+      $set: { updatedAt: new Date() },
+      $setOnInsert: { creator: order.creator, totalWithdrawn: 0 },
+    },
+    { upsert: true }
+  );
+}
+
 router.post('/mpesa/stkpush', protect, async (req, res) => {
   try {
     const { orderId, phone } = req.body;
@@ -16,11 +37,9 @@ router.post('/mpesa/stkpush', protect, async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found' });
     if (String(order.user) !== String(req.user._id))
       return res.status(403).json({ error: 'Forbidden' });
-    if (order.status === 'paid')
-      return res.json({ alreadyPaid: true, order });
+    if (order.status === 'paid') return res.json({ alreadyPaid: true, order });
 
     const normalized = normalizePhone(phone);
-
     const result = await stkPush({
       phone: normalized,
       amount: order.amount,
@@ -34,7 +53,7 @@ router.post('/mpesa/stkpush', protect, async (req, res) => {
     await order.save();
 
     res.json({
-      message: 'STK push sent. Enter your M-Pesa PIN.',
+      message: 'STK push sent',
       checkoutRequestId: result.CheckoutRequestID,
       orderId: order._id,
     });
@@ -44,46 +63,31 @@ router.post('/mpesa/stkpush', protect, async (req, res) => {
   }
 });
 
-// Poll status endpoint — frontend can call this
 router.get('/mpesa/status/:orderId', protect, async (req, res) => {
   const order = await Order.findById(req.params.orderId);
   if (!order) return res.status(404).json({ error: 'Not found' });
-
   if (order.status === 'paid') return res.json({ status: 'paid', order });
 
-  // Optionally query Daraja for latest status
   try {
     if (order.checkoutRequestId) {
       const q = await stkQuery({ checkoutRequestId: order.checkoutRequestId });
-      if (q.ResultCode === '0') {
-        order.status = 'paid';
-        order.paidAt = new Date();
-        if (!order.mpesaReceipt) order.mpesaReceipt = q.ResultDesc || 'CONFIRMED';
-        await order.save();
-        await Template.findByIdAndUpdate(order.template, { $inc: { sales: 1 } });
+      if (q.ResultCode === '0' || q.ResultCode === 0) {
+        await finalizeOrder(order, q.ResultDesc);
       }
       return res.json({ status: order.status, raw: q });
     }
-  } catch (e) {
-    // ignore
-  }
-
+  } catch {}
   res.json({ status: order.status });
 });
 
-// Daraja callback — this is where we VERIFY payment server-side
 router.post('/callback', async (req, res) => {
   try {
     const body = req.body?.Body?.stkCallback;
     if (!body) return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
 
     const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = body;
-
     const order = await Order.findOne({ checkoutRequestId: CheckoutRequestID });
-    if (!order) {
-      console.warn('Callback: order not found for', CheckoutRequestID);
-      return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
-    }
+    if (!order) return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
 
     if (ResultCode === 0) {
       let receipt = null;
@@ -91,19 +95,13 @@ router.post('/callback', async (req, res) => {
         const found = CallbackMetadata.Item.find((i) => i.Name === 'MpesaReceiptNumber');
         receipt = found?.Value;
       }
-      order.status = 'paid';
-      order.paidAt = new Date();
-      order.mpesaReceipt = receipt;
-      await order.save();
-      await Template.findByIdAndUpdate(order.template, { $inc: { sales: 1 } });
+      await finalizeOrder(order, receipt);
       console.log('✅ Payment confirmed for order', order._id, 'Receipt:', receipt);
     } else {
       order.status = ResultCode === 1032 ? 'cancelled' : 'failed';
       order.mpesaReceipt = ResultDesc;
       await order.save();
-      console.log('❌ Payment failed:', ResultDesc);
     }
-
     res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
   } catch (err) {
     console.error('Callback error', err);
