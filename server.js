@@ -10,8 +10,7 @@ const connectDB = require('./config/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-connectDB();
-
+// Security & parsers
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '2mb' }));
@@ -24,6 +23,7 @@ app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/previews', express.static(path.join(__dirname, 'uploads', 'previews')));
 app.use('/portfolios', express.static(path.join(__dirname, 'uploads', 'portfolios')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // fixes admin portfolio links
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -57,4 +57,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Server error' });
 });
 
-app.listen(PORT, () => console.log(`🚀 PixelVault running on http://localhost:${PORT}`));
+// ⭐ START ONLY AFTER DB CONNECTS
+connectDB().then(() => {
+  app.listen(PORT, () => console.log(`🚀 PixelVault running on http://localhost:${PORT}`));
+});
