@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Upload Template — PixelVault</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar"><div class="container nav-inner">
+    <a href="/" class="brand">PixelVault</a><div class="nav-links" id="nav-links"></div>
+  </div></nav>
+
+  <div class="container" style="padding:40px 24px">
+    <h1 class="section-title">Upload <span>Template</span></h1>
+    <form class="admin-form" id="up-form">
+      <div id="msg"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Title</label><input name="title" required /></div>
+        <div class="form-group">
+          <label>Category</label>
+          <select name="category" required>
+            <option>Logo</option><option>Flyer</option><option>Social Media</option>
+            <option>Presentation</option><option>Business Card</option>
+            <option>Resume</option><option>UI Kit</option><option>Illustration</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Description</label><textarea name="description" rows="4" required></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Price (KES)</label><input type="number" name="price" min="10" required /></div>
+        <div class="form-group"><label>Tags (comma separated)</label><input name="tags" placeholder="logo, minimal" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Preview Image</label><input type="file" name="preview" accept="image/*" required /></div>
+        <div class="form-group"><label>ZIP File</label><input type="file" name="file" accept=".zip" required /></div>
+      </div>
+      <button class="btn btn-primary" type="submit">Upload Template</button>
+    </form>
+  </div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    (async () => {
+      const user = await getCurrentUser();
+      if (!user || user.role !== 'creator' || user.status !== 'active') { location.href = '/login'; return; }
+
+      const form = document.getElementById('up-form');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('button'), msg = document.getElementById('msg');
+        msg.innerHTML = ''; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Uploading...';
+        const fd = new FormData();
+        ['title','description','category','price','tags'].forEach(k => fd.append(k, form[k].value));
+        fd.append('preview', form.preview.files[0]);
+        fd.append('file', form.file.files[0]);
+        try {
+          await apiForm('/creator/templates', fd);
+          msg.innerHTML = `<div class="alert alert-success">✅ Uploaded!</div>`;
+          form.reset();
+          setTimeout(() => location.href = '/creator/dashboard', 800);
+        } catch (err) {
+          msg.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+          btn.disabled = false; btn.textContent = 'Upload Template';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
