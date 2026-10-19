@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Application — PixelVault</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar"><div class="container nav-inner">
+    <a href="/" class="brand">PixelVault</a><div class="nav-links" id="nav-links"></div>
+  </div></nav>
+  <div class="container">
+    <div class="form-card" style="max-width:600px">
+      <h2>Submit your <span>application</span></h2>
+      <div id="msg"></div>
+      <div id="status-box"></div>
+      <form id="app-form" class="hidden">
+        <div class="form-group">
+          <label>Cover Letter</label>
+          <textarea name="coverLetter" rows="4" required placeholder="Tell us about yourself..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Experience (optional)</label>
+          <textarea name="experience" rows="3" placeholder="Past work, clients, etc."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Resume (PDF/DOC)</label>
+            <input type="file" name="resume" accept=".pdf,.doc,.docx" required />
+          </div>
+          <div class="form-group">
+            <label>Portfolio (PDF/ZIP/Image)</label>
+            <input type="file" name="portfolio" accept=".pdf,.zip,.jpg,.jpeg,.png" required />
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Submit Application</button>
+      </form>
+    </div>
+  </div>
+  <script src="/js/main.js"></script>
+  <script>
+    (async () => {
+      const user = await getCurrentUser();
+      if (!user || user.role !== 'creator') { location.href = '/login'; return; }
+
+      const form = document.getElementById('app-form');
+      const statusBox = document.getElementById('status-box');
+      const msg = document.getElementById('msg');
+
+      if (user.status === 'active') { location.href = '/creator/dashboard'; return; }
+
+      const apps = await api('/applications/mine');
+      const pending = apps.find(a => a.status === 'pending');
+      const rejected = apps.find(a => a.status === 'rejected');
+
+      if (pending) {
+        statusBox.innerHTML = `<div class="alert alert-info">⏳ Your application is under review. You'll be notified once the admin responds.</div>`;
+        return;
+      }
+      if (rejected) {
+        statusBox.innerHTML = `<div class="alert alert-error">❌ Previous application rejected. ${rejected.adminNote ? 'Reason: ' + escapeHtml(rejected.adminNote) : ''}<br>You may submit a new application below.</div>`;
+      } else {
+        statusBox.innerHTML = `<div class="alert alert-info">Step 2 of 2 — upload your resume and portfolio for admin review.</div>`;
+      }
+      form.classList.remove('hidden');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('button');
+        msg.innerHTML = ''; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Submitting...';
+        const fd = new FormData();
+        fd.append('coverLetter', form.coverLetter.value);
+        fd.append('experience', form.experience.value);
+        fd.append('resume', form.resume.files[0]);
+        fd.append('portfolio', form.portfolio.files[0]);
+        try {
+          await apiForm('/applications', fd);
+          statusBox.innerHTML = `<div class="alert alert-success">✅ Application submitted! Please wait for admin approval.</div>`;
+          form.classList.add('hidden');
+        } catch (err) {
+          msg.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+          btn.disabled = false; btn.textContent = 'Submit Application';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
