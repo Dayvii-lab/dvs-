@@ -36,7 +36,7 @@ const fileFilter = (req, file, cb) => {
 
 module.exports = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
 
-// Helper instances
+// Helpers for specific routes
 module.exports.templateUpload = module.exports.fields([
   { name: 'preview', maxCount: 1 },
   { name: 'file', maxCount: 1 },
