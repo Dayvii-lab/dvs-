@@ -7,7 +7,7 @@ const upload = require('../middleware/upload');
 
 const router = express.Router();
 
-// Creator submits application
+// 1. Creator submits application
 router.post('/', protect, upload.applicationUpload, async (req, res) => {
   try {
     if (req.user.role !== 'creator')
@@ -43,13 +43,13 @@ router.post('/', protect, upload.applicationUpload, async (req, res) => {
   }
 });
 
-// Creator sees their own application status
+// 2. Creator sees their own application status
 router.get('/mine', protect, async (req, res) => {
   const apps = await Application.find({ user: req.user._id }).sort({ createdAt: -1 });
   res.json(apps);
 });
 
-// Admin: list all applications
+// 3. Admin: list all applications
 router.get('/', protect, adminOnly, async (req, res) => {
   const { status } = req.query;
   const filter = status ? { status } : {};
@@ -59,7 +59,7 @@ router.get('/', protect, adminOnly, async (req, res) => {
   res.json(apps);
 });
 
-// Admin: approve
+// 4. Admin: approve
 router.post('/:id/approve', protect, adminOnly, async (req, res) => {
   const app = await Application.findById(req.params.id);
   if (!app) return res.status(404).json({ error: 'Not found' });
@@ -83,7 +83,7 @@ router.post('/:id/approve', protect, adminOnly, async (req, res) => {
   res.json({ message: 'Approved', application: app });
 });
 
-// Admin: reject
+// 5. Admin: reject
 router.post('/:id/reject', protect, adminOnly, async (req, res) => {
   const { note } = req.body;
   const app = await Application.findById(req.params.id);
