@@ -3,11 +3,17 @@ const path = require('path');
 const fs = require('fs');
 const { nanoid } = require('nanoid');
 
-const ensure = (d) => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); };
-const previews = path.join(__dirname, '..', 'uploads', 'previews');
-const files = path.join(__dirname, '..', 'uploads', 'files');
-const portfolios = path.join(__dirname, '..', 'uploads', 'portfolios');
-[previews, files, portfolios].forEach(ensure);
+// Ensure the directories exist before Multer initializes
+const baseUploads = path.join(__dirname, '..', 'uploads');
+const previews = path.join(baseUploads, 'previews');
+const files = path.join(baseUploads, 'files');
+const portfolios = path.join(baseUploads, 'portfolios');
+
+[baseUploads, previews, files, portfolios].forEach((dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -36,7 +42,6 @@ const fileFilter = (req, file, cb) => {
 
 module.exports = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
 
-// Helpers for specific routes
 module.exports.templateUpload = module.exports.fields([
   { name: 'preview', maxCount: 1 },
   { name: 'file', maxCount: 1 },
