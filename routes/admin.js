@@ -7,7 +7,7 @@ const { protect, adminOnly } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Stats
+// Admin Stats
 router.get('/stats', protect, adminOnly, async (req, res) => {
   const [users, creators, templates, orders, pendingApps] = await Promise.all([
     User.countDocuments({ role: 'customer' }),
@@ -16,10 +16,12 @@ router.get('/stats', protect, adminOnly, async (req, res) => {
     Order.countDocuments({ status: 'paid' }),
     Application.countDocuments({ status: 'pending' }),
   ]);
+  
   const revenueAgg = await Order.aggregate([
     { $match: { status: 'paid' } },
     { $group: { _id: null, total: { $sum: '$platformFee' } } },
   ]);
+
   res.json({
     customers: users,
     creators,
@@ -36,7 +38,7 @@ router.get('/creators', protect, adminOnly, async (req, res) => {
   res.json(creators);
 });
 
-// Suspend / reactivate
+// Suspend / reactivate creator
 router.post('/creators/:id/suspend', protect, adminOnly, async (req, res) => {
   const u = await User.findById(req.params.id);
   if (!u || u.role !== 'creator') return res.status(404).json({ error: 'Not found' });
@@ -45,7 +47,7 @@ router.post('/creators/:id/suspend', protect, adminOnly, async (req, res) => {
   res.json({ user: { id: u._id, status: u.status } });
 });
 
-// Templates moderation
+// List templates
 router.get('/templates', protect, adminOnly, async (req, res) => {
   const templates = await Template.find()
     .populate('creator', 'name username')
@@ -53,6 +55,7 @@ router.get('/templates', protect, adminOnly, async (req, res) => {
   res.json(templates);
 });
 
+// Toggle template active status
 router.post('/templates/:id/toggle', protect, adminOnly, async (req, res) => {
   const t = await Template.findById(req.params.id);
   if (!t) return res.status(404).json({ error: 'Not found' });
