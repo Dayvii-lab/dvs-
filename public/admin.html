@@ -1,73 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin — PixelVault</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <nav class="navbar">
-    <div class="container nav-inner">
-      <a href="/" class="brand">PixelVault</a>
-      <div class="nav-links" id="nav-links"></div>
-    </div>
-  </nav>
+  <nav class="navbar"><div class="container nav-inner">
+    <a href="/" class="brand">PixelVault</a><div class="nav-links" id="nav-links"></div>
+  </div></nav>
 
-  <div class="container" style="padding: 40px 24px;">
-    <h1 class="section-title">Admin Panel</h1>
+  <div class="container" style="padding:40px 24px">
+    <h1 class="section-title">Admin <span>Panel</span></h1>
 
-    <div class="admin-form">
-      <h3>Add New Template</h3>
-      <div id="admin-msg"></div>
-      <form id="create-form">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Title</label>
-            <input name="title" required />
-          </div>
-          <div class="form-group">
-            <label>Category</label>
-            <select name="category" required>
-              <option>Logo</option><option>Flyer</option><option>Social Media</option>
-              <option>Presentation</option><option>Business Card</option>
-              <option>Resume</option><option>UI Kit</option><option>Other</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Description</label>
-          <textarea name="description" rows="3" required></textarea>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Price (KES)</label>
-            <input type="number" name="price" min="0" step="1" required />
-          </div>
-          <div class="form-group">
-            <label>Tags (comma separated)</label>
-            <input name="tags" placeholder="logo, minimal, brand" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Preview Image (jpg/png/webp)</label>
-            <input type="file" name="preview" accept="image/*" required />
-          </div>
-          <div class="form-group">
-            <label>ZIP File</label>
-            <input type="file" name="file" accept=".zip" required />
-          </div>
-        </div>
-        <div class="form-group">
-          <label><input type="checkbox" name="featured" value="true" /> Featured</label>
-        </div>
-        <button class="btn btn-primary" type="submit">Create Template</button>
-      </form>
+    <div class="stats-grid" id="stats"></div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="apps">Applications</button>
+      <button class="tab" data-tab="creators">Creators</button>
+      <button class="tab" data-tab="templates">Templates</button>
     </div>
 
-    <h3 class="section-title">All Templates</h3>
-    <div id="list"><div class="loading">Loading...</div></div>
+    <div id="tab-apps"></div>
+    <div id="tab-creators" class="hidden"></div>
+    <div id="tab-templates" class="hidden"></div>
   </div>
 
   <script src="/js/main.js"></script>
@@ -76,57 +32,114 @@
       const user = await getCurrentUser();
       if (!user || user.role !== 'admin') { location.href = '/'; return; }
 
-      const list = document.getElementById('list');
+      // Stats
+      const s = await api('/admin/stats');
+      document.getElementById('stats').innerHTML = `
+        <div class="stat-card"><div class="label">Customers</div><div class="value">${s.customers}</div></div>
+        <div class="stat-card"><div class="label">Creators</div><div class="value">${s.creators}</div></div>
+        <div class="stat-card"><div class="label">Templates</div><div class="value">${s.templates}</div></div>
+        <div class="stat-card"><div class="label">Paid Orders</div><div class="value">${s.orders}</div></div>
+        <div class="stat-card"><div class="label">Pending Apps</div><div class="value">${s.pendingApplications}</div></div>
+        <div class="stat-card"><div class="label">Platform Revenue</div><div class="value">${formatKES(s.platformRevenue)}</div></div>
+      `;
 
-      async function loadList() {
-        const templates = await api('/templates');
-        list.innerHTML = templates.map(t => `
+      // Applications
+      async function loadApps() {
+        const apps = await api('/applications');
+        const box = document.getElementById('tab-apps');
+        if (!apps.length) { box.innerHTML = `<div class="empty">No applications.</div>`; return; }
+        box.innerHTML = apps.map(a => `
+          <div class="panel">
+            <div style="display:flex;justify-content:space-between;align-items:start;gap:16px;flex-wrap:wrap">
+              <div>
+                <h4>${escapeHtml(a.user?.name)} <span style="color:var(--muted);font-weight:400">@${escapeHtml(a.user?.username)}</span></h4>
+                <p style="color:var(--muted);font-size:0.85rem">${escapeHtml(a.user?.email)} · ${escapeHtml(a.user?.phone)}</p>
+                <p style="margin-top:8px;white-space:pre-line">${escapeHtml(a.coverLetter)}</p>
+                ${a.experience ? `<p style="margin-top:8px;color:var(--muted);font-size:0.85rem"><b>Experience:</b> ${escapeHtml(a.experience)}</p>` : ''}
+                <p style="margin-top:10px;font-size:0.85rem">
+                  <a href="/${a.resumePath}" target="_blank" style="color:var(--primary)">View Resume</a> ·
+                  <a href="/${a.portfolioPath}" target="_blank" style="color:var(--primary)">View Portfolio</a>
+                </p>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;align-items:end">
+                <span class="badge badge-${a.status}">${a.status}</span>
+                ${a.status === 'pending' ? `
+                  <button class="btn btn-success btn-sm" data-approve="${a._id}">Approve</button>
+                  <button class="btn btn-danger btn-sm" data-reject="${a._id}">Reject</button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        box.querySelectorAll('[data-approve]').forEach(b => b.addEventListener('click', async (e) => {
+          await api('/applications/' + e.target.dataset.approve + '/approve', { method: 'POST' });
+          location.reload();
+        }));
+        box.querySelectorAll('[data-reject]').forEach(b => b.addEventListener('click', async (e) => {
+          const note = prompt('Reason (optional):') || '';
+          await api('/applications/' + e.target.dataset.reject + '/reject', {
+            method: 'POST', body: JSON.stringify({ note }),
+          });
+          location.reload();
+        }));
+      }
+      loadApps();
+
+      // Creators
+      async function loadCreators() {
+        const cs = await api('/admin/creators');
+        const box = document.getElementById('tab-creators');
+        if (!cs.length) { box.innerHTML = `<div class="empty">No creators yet.</div>`; return; }
+        box.innerHTML = cs.map(c => `
+          <div class="order-row">
+            <div class="info">
+              <h4>${escapeHtml(c.name)} <span style="color:var(--muted);font-weight:400">@${escapeHtml(c.username)}</span></h4>
+              <p>${escapeHtml(c.email)} · ${escapeHtml(c.phone)}</p>
+            </div>
+            <span class="badge badge-${c.status}">${c.status}</span>
+            <button class="btn btn-outline btn-sm" data-toggle="${c._id}">${c.status === 'suspended' ? 'Reactivate' : 'Suspend'}</button>
+          </div>
+        `).join('');
+        box.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', async (e) => {
+          await api('/admin/creators/' + e.target.dataset.toggle + '/suspend', { method: 'POST' });
+          loadCreators();
+        }));
+      }
+
+      // Templates
+      async function loadTemplates() {
+        const ts = await api('/admin/templates');
+        const box = document.getElementById('tab-templates');
+        if (!ts.length) { box.innerHTML = `<div class="empty">No templates.</div>`; return; }
+        box.innerHTML = ts.map(t => `
           <div class="order-row">
             <img src="${t.previewImage}" />
             <div class="info">
               <h4>${escapeHtml(t.title)}</h4>
-              <p>${escapeHtml(t.category)} · ${formatKES(t.price)} · ${t.sales} sales</p>
+              <p>By ${escapeHtml(t.creator?.name || '?')} · ${formatKES(t.price)} · ${t.sales} sales</p>
             </div>
-            <button class="btn btn-danger" data-del="${t._id}">Delete</button>
+            <span class="badge badge-${t.active ? 'active' : 'suspended'}">${t.active ? 'active' : 'hidden'}</span>
+            <button class="btn btn-outline btn-sm" data-tog="${t._id}">${t.active ? 'Hide' : 'Show'}</button>
           </div>
         `).join('');
-
-        list.querySelectorAll('[data-del]').forEach(b => {
-          b.addEventListener('click', async (e) => {
-            if (!confirm('Delete this template?')) return;
-            await api('/templates/' + e.target.dataset.del, { method: 'DELETE' });
-            loadList();
-          });
-        });
+        box.querySelectorAll('[data-tog]').forEach(b => b.addEventListener('click', async (e) => {
+          await api('/admin/templates/' + e.target.dataset.tog + '/toggle', { method: 'POST' });
+          loadTemplates();
+        }));
       }
-      loadList();
 
-      document.getElementById('create-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const btn = form.querySelector('button');
-        const msg = document.getElementById('admin-msg');
-        msg.innerHTML = '';
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> Uploading...';
-
-        const fd = new FormData();
-        ['title', 'category', 'description', 'price', 'tags'].forEach(k => fd.append(k, form[k].value));
-        if (form.featured.checked) fd.append('featured', 'true');
-        fd.append('preview', form.preview.files[0]);
-        fd.append('file', form.file.files[0]);
-
-        try {
-          await apiForm('/templates', fd);
-          msg.innerHTML = `<div class="alert alert-success">✅ Template created!</div>`;
-          form.reset();
-          loadList();
-        } catch (err) {
-          msg.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
-        } finally {
-          btn.disabled = false;
-          btn.textContent = 'Create Template';
-        }
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          const n = tab.dataset.tab;
+          document.getElementById('tab-apps').classList.toggle('hidden', n !== 'apps');
+          document.getElementById('tab-creators').classList.toggle('hidden', n !== 'creators');
+          document.getElementById('tab-templates').classList.toggle('hidden', n !== 'templates');
+          if (n === 'creators') loadCreators();
+          if (n === 'templates') loadTemplates();
+        });
       });
     })();
   </script>
