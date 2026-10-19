@@ -15,10 +15,13 @@ const sendCookie = (res, token) => {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/',   // ⭐ ensures cookie is sent to every route
   });
 };
 
+// ────────────────────────────────────────────────
 // CUSTOMER REGISTER
+// ────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
     const { name, username, email, phone, password } = req.body;
@@ -31,17 +34,25 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Username taken' });
 
     const user = await User.create({
-      name, username, email, phone, password, role: 'customer', status: 'active',
+      name, username, email, phone, password,
+      role: 'customer', status: 'active',
     });
     const token = signToken(user._id);
     sendCookie(res, token);
-    res.json({ user: { id: user._id, name: user.name, username: user.username, role: user.role } });
+    res.json({
+      user: {
+        id: user._id, name: user.name, username: user.username,
+        role: user.role, status: user.status,
+      },
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// CREATOR REGISTER (creates pending account)
+// ────────────────────────────────────────────────
+// CREATOR REGISTER (pending approval)
+// ────────────────────────────────────────────────
 router.post('/creator/register', async (req, res) => {
   try {
     const { name, username, email, phone, password } = req.body;
@@ -54,20 +65,31 @@ router.post('/creator/register', async (req, res) => {
       return res.status(400).json({ error: 'Username taken' });
 
     const user = await User.create({
-      name, username, email, phone, password, role: 'creator', status: 'pending',
+      name, username, email, phone, password,
+      role: 'creator', status: 'pending',
     });
     const token = signToken(user._id);
     sendCookie(res, token);
-    res.json({ user: { id: user._id, name: user.name, username: user.username, role: user.role, status: user.status } });
+    res.json({
+      user: {
+        id: user._id, name: user.name, username: user.username,
+        role: user.role, status: user.status,
+      },
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// LOGIN (customer, creator, admin)
+// ────────────────────────────────────────────────
+// LOGIN (all roles)
+// ────────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password)
+      return res.status(400).json({ error: 'Email and password required' });
+
     const user = await User.findOne({ email }).select('+password');
     if (!user || !(await user.comparePassword(password)))
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -85,20 +107,32 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ────────────────────────────────────────────────
+// LOGOUT
+// ────────────────────────────────────────────────
 router.post('/logout', (req, res) => {
-  res.clearCookie('token');
+  res.clearCookie('token', { path: '/' });
   res.json({ message: 'Logged out' });
 });
 
+// ────────────────────────────────────────────────
+// WHO AM I
+// ────────────────────────────────────────────────
 router.get('/me', protect, async (req, res) => {
   const payload = {
-    id: req.user._id, name: req.user.name, username: req.user.username,
-    email: req.user.email, phone: req.user.phone,
-    role: req.user.role, status: req.user.status,
+    id: req.user._id,
+    name: req.user.name,
+    username: req.user.username,
+    email: req.user.email,
+    phone: req.user.phone,
+    role: req.user.role,
+    status: req.user.status,
   };
   if (req.user.role === 'creator') {
     const wallet = await Wallet.findOne({ creator: req.user._id });
-    payload.wallet = wallet ? { balance: wallet.balance, totalEarned: wallet.totalEarned } : { balance: 0, totalEarned: 0 };
+    payload.wallet = wallet
+      ? { balance: wallet.balance, totalEarned: wallet.totalEarned }
+      : { balance: 0, totalEarned: 0 };
   }
   res.json({ user: payload });
 });
