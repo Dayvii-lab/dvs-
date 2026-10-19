@@ -5,8 +5,8 @@ const orderSchema = new mongoose.Schema({
   template: { type: mongoose.Schema.Types.ObjectId, ref: 'Template', required: true },
   creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   amount: { type: Number, required: true },
-  creatorEarnings: { type: Number, required: true }, // 85% default
-  platformFee: { type: Number, required: true },      // 15%
+  creatorEarnings: { type: Number, required: true },
+  platformFee: { type: Number, required: true },
   status: { type: String, enum: ['pending', 'paid', 'failed', 'cancelled'], default: 'pending' },
   paymentMethod: { type: String, default: 'mpesa' },
   mpesaReceipt: String,
