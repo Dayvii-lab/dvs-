@@ -1,4 +1,3 @@
-// Shared utilities
 const API = '/api';
 
 async function api(path, options = {}) {
@@ -12,9 +11,9 @@ async function api(path, options = {}) {
   return data;
 }
 
-async function apiForm(path, formData) {
+async function apiForm(path, formData, method = 'POST') {
   const res = await fetch(API + path, {
-    method: 'POST',
+    method,
     credentials: 'include',
     body: formData,
   });
@@ -23,18 +22,15 @@ async function apiForm(path, formData) {
   return data;
 }
 
-function formatKES(n) {
-  return 'KES ' + Number(n).toLocaleString();
-}
+const formatKES = (n) => 'KES ' + Number(n || 0).toLocaleString();
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) =>
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 async function getCurrentUser() {
-  try { return (await api('/auth/me')).user; }
-  catch { return null; }
+  try { return (await api('/auth/me')).user; } catch { return null; }
 }
 
 async function renderNav() {
@@ -43,11 +39,16 @@ async function renderNav() {
   if (!nav) return user;
 
   if (user) {
+    let extra = '';
+    if (user.role === 'admin') extra = '<a href="/admin">Admin</a>';
+    else if (user.role === 'creator') extra = '<a href="/creator/dashboard">Creator Hub</a>';
+    else extra = '<a href="/dashboard">My Purchases</a>';
+
     nav.innerHTML = `
-      <a href="/dashboard">Dashboard</a>
-      ${user.role === 'admin' ? '<a href="/admin">Admin</a>' : ''}
+      <a href="/">Browse</a>
+      ${extra}
       <span style="color:var(--muted)">Hi, ${escapeHtml(user.name.split(' ')[0])}</span>
-      <button class="btn btn-outline" id="logout-btn">Logout</button>
+      <button class="btn btn-outline btn-sm" id="logout-btn">Logout</button>
     `;
     document.getElementById('logout-btn').addEventListener('click', async () => {
       await api('/auth/logout', { method: 'POST' });
@@ -56,8 +57,9 @@ async function renderNav() {
   } else {
     nav.innerHTML = `
       <a href="/">Browse</a>
+      <a href="/creator-register">Become a Creator</a>
       <a href="/login">Login</a>
-      <a href="/register" class="btn btn-primary">Sign Up</a>
+      <a href="/register" class="btn btn-primary btn-sm">Sign Up</a>
     `;
   }
   return user;
