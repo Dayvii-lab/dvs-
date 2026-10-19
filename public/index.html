@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PixelVault — Premium Digital Templates</title>
+  <title>PixelVault — Creator Marketplace</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
@@ -16,9 +16,10 @@
 
   <section class="hero">
     <div class="container">
-      <h1>Premium Digital Templates<br />for Creators &amp; Pros</h1>
-      <p>Logos, flyers, social kits, pitch decks, and more. Instantly downloadable after secure M-Pesa payment.</p>
+      <h1>Premium Templates from <span>Top Creators</span></h1>
+      <p>Buy editable designs from vetted creators. Instant download after secure M-Pesa payment.</p>
       <a href="#catalog" class="btn btn-primary">Browse Templates</a>
+      <a href="/creator-register" class="btn btn-outline" style="margin-left:12px">Sell Your Work</a>
     </div>
   </section>
 
@@ -27,13 +28,9 @@
       <input type="text" id="search" placeholder="Search templates..." />
       <select id="category">
         <option value="All">All Categories</option>
-        <option>Logo</option>
-        <option>Flyer</option>
-        <option>Social Media</option>
-        <option>Presentation</option>
-        <option>Business Card</option>
-        <option>Resume</option>
-        <option>UI Kit</option>
+        <option>Logo</option><option>Flyer</option><option>Social Media</option>
+        <option>Presentation</option><option>Business Card</option>
+        <option>Resume</option><option>UI Kit</option><option>Illustration</option>
         <option>Other</option>
       </select>
       <select id="sort">
@@ -43,7 +40,6 @@
         <option value="price_desc">Price: High → Low</option>
       </select>
     </div>
-
     <div id="grid" class="grid"></div>
     <div id="loading" class="loading">Loading templates...</div>
     <div id="empty" class="empty hidden">No templates found.</div>
@@ -56,15 +52,11 @@
     const empty = document.getElementById('empty');
 
     async function load() {
-      loading.classList.remove('hidden');
-      grid.innerHTML = '';
-      empty.classList.add('hidden');
-
+      loading.classList.remove('hidden'); grid.innerHTML = ''; empty.classList.add('hidden');
+      const params = new URLSearchParams();
       const q = document.getElementById('search').value.trim();
       const cat = document.getElementById('category').value;
       const sort = document.getElementById('sort').value;
-
-      const params = new URLSearchParams();
       if (q) params.set('q', q);
       if (cat && cat !== 'All') params.set('category', cat);
       if (sort) params.set('sort', sort);
@@ -72,15 +64,14 @@
       try {
         const templates = await api('/templates?' + params.toString());
         loading.classList.add('hidden');
-
         if (!templates.length) { empty.classList.remove('hidden'); return; }
-
         grid.innerHTML = templates.map(t => `
           <a href="/template/${t._id}" class="card">
-            <img src="${t.previewImage}" alt="${escapeHtml(t.title)}" class="card-img" loading="lazy" />
+            <img src="${t.previewImage}" class="card-img" loading="lazy" />
             <div class="card-body">
               <span class="card-cat">${escapeHtml(t.category)}</span>
               <h3 class="card-title">${escapeHtml(t.title)}</h3>
+              <div class="card-creator">by ${escapeHtml(t.creator?.name || 'Creator')}</div>
               <div class="card-footer">
                 <span class="price">${formatKES(t.price)}</span>
                 <span style="color:var(--muted);font-size:0.8rem">${t.sales} sold</span>
@@ -89,17 +80,13 @@
           </a>
         `).join('');
       } catch (err) {
-        loading.textContent = 'Failed to load: ' + err.message;
+        loading.textContent = 'Failed: ' + err.message;
       }
     }
-
-    let debounce;
-    document.getElementById('search').addEventListener('input', () => {
-      clearTimeout(debounce); debounce = setTimeout(load, 300);
-    });
+    let deb;
+    document.getElementById('search').addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(load, 300); });
     document.getElementById('category').addEventListener('change', load);
     document.getElementById('sort').addEventListener('change', load);
-
     load();
   </script>
 </body>
